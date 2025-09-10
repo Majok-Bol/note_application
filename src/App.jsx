@@ -7,41 +7,74 @@ export default function App() {
   const [editIndex, setEditIndex] = useState(null);
   //store notes
   const [storeNotes, setStoreNotes] = useState([]);
-  useEffect(() => {
-    async function fetchData(){
-let {data,error}=await supabase.from("notes").select("*");
-console.log(data);
-console.log(error);
+useEffect(() => {
+  async function fetchData() {
+    let { data, error } = await supabase.from("notes").select("*").order("id", { ascending: true });
+    if (error) {
+      console.error("Error fetching notes:", error.message);
+    } else {
+      setStoreNotes(data); //  put notes into React state
     }
-    fetchData();
-    })
+  }
+  fetchData();
+}, []); // empty dependency so it runs only once when app loads
+
     
 
-  function handleAddNotes() {
-    if (note.trim() == ""){
-alert("Note is empty");
-return;
-    } 
-    if (editIndex !== null) {
+async function handleAddNotes() {
+  if (note.trim() === "") {
+    alert("Note is empty");
+    return;
+  }
+
+  if (editIndex !== null) {
+    //  Update note in Supabase
+    const noteToUpdate = storeNotes[editIndex];
+    let { error } = await supabase
+      .from("notes")
+      .update({ content: note })
+      .eq("id", noteToUpdate.id);
+
+    if (error) {
+      console.error("Error updating note:", error.message);
+    } else {
       const updatedNotes = [...storeNotes];
-      updatedNotes[editIndex] = note;
+      updatedNotes[editIndex].content = note;
       setStoreNotes(updatedNotes);
       setEditIndex(null);
-    } else {
-      //add new note
-      const newNote = [...storeNotes, note];
-      setStoreNotes(newNote);
     }
-    setNote("");
+  } else {
+    // Insert new note
+    let { data, error } = await supabase
+      .from("notes")
+      .insert([{ content: note }])
+      .select();
+
+    if (error) {
+      console.error("Error adding note:", error.message);
+    } else {
+      setStoreNotes([...storeNotes, data[0]]);
+    }
   }
-  function handleDeleteNotes(index) {
+  setNote("");
+}
+
+async function handleDeleteNotes(index) {
+  const noteToDelete = storeNotes[index];
+  let { error } = await supabase.from("notes").delete().eq("id", noteToDelete.id);
+
+  if (error) {
+    console.error("Error deleting note:", error.message);
+  } else {
     const updatedNotes = storeNotes.filter((_, i) => i !== index);
     setStoreNotes(updatedNotes);
   }
-  function handleEditNotes(index) {
-    setNote(storeNotes[index]);
-    setEditIndex(index);
-  }
+}
+function handleEditNotes(index) {
+  setNote(storeNotes[index].content);
+  setEditIndex(index);
+}
+
   return (
     <>
       <h1>Note Application</h1>
@@ -58,25 +91,16 @@ return;
       <div>
         <h2>Saved Notes</h2>
         <div>
-          <ul>
-            {storeNotes.map((item, index) => (
-              <li key={index}>
-                {item}
-                <button
-                  className="editBtn"
-                  onClick={() => handleEditNotes(index)}
-                >
-                  Edit
-                </button>
-                <button
-                  className="deleteBtn"
-                  onClick={() => handleDeleteNotes(index)}
-                >
-                  Delete
-                </button>
-              </li>
-            ))}
-          </ul>
+       <ul>
+  {storeNotes.map((item, index) => (
+    <li key={item.id}>
+      {item.content}
+      <button onClick={() => handleEditNotes(index)}>Edit</button>
+      <button onClick={() => handleDeleteNotes(index)}>Delete</button>
+    </li>
+  ))}
+</ul>
+
         </div>
       </div>
     </>
